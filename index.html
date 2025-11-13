@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ブレーダー勝敗集計</title>
+  <style>
+    @font-face {
+      font-family: 'CyberFont';
+      src: url('./madoufmg.ttf') format('truetype');
+    }
+    body {
+      background: #111;
+      color: #fff;
+      font-family: 'CyberFont', sans-serif;
+      text-align: center;
+      padding-top: 0px;
+    }
+    .card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 20px;
+      width: 100%;
+      margin: 20px auto;
+      box-shadow: 0 0 10px rgba(0,255,255,0.2);
+    }
+    .title { font-size: 22px; margin-bottom: 8px; }
+    .result { display: flex; justify-content: space-around; margin-top: 15px;}
+    .section { display: flex; flex-direction: column; align-items: center; }
+    .count { font-size: 50px; font-weight: bold; margin-bottom: 6px; }
+    .sub { font-size: 32px; opacity: 0.8; }
+    .win { color: cyan; }
+    .lose { color: pink; }
+    .draw { color: orange; }
+  </style>
+</head>
+<body>
+  <!-- 総合勝敗カード -->
+  <div class="card">
+    <div class="title">ブレーダー名：<span id="bladerName">ベイメット</span></div>
+    <div class="result">
+      <div class="section">
+        <div>勝ち</div>
+        <div class="count win" id="winCount">...</div>
+        <div class="sub">得点 <span id="winPoints">0</span></div>
+      </div>
+      <div class="section">
+        <div>負け</div>
+        <div class="count lose" id="loseCount">...</div>
+        <div class="sub">失点 <span id="losePoints">0</span></div>
+      </div>
+      <div class="section">
+        <div>引き分け</div>
+        <div class="count draw" id="drawCount">...</div>
+        <div class="sub">得失点差 <span id="diffPoints">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- L/Rサイド勝率カード -->
+  <div class="card">
+    <div class="result">
+      <div class="section">
+        <div>Lサイド勝率</div>
+        <div class="count win" id="lWinRate">...</div>
+      </div>
+      <div class="section">
+        <div>Rサイド勝率</div>
+        <div class="count win" id="rWinRate">...</div>
+      </div>
+    </div>
+  </div>
+  <!-- Gearカード -->
+  <div class="card">
+    <div class="title" id="gearTitle1">...</div>
+    <div class="result" id="gearContent1">...</div>
+  </div>
+  <div class="card">
+    <div class="title" id="gearTitle2">...</div>
+    <div class="result" id="gearContent2">...</div>
+  </div>
+  <div class="card">
+    <div class="title" id="gearTitle3">...</div>
+    <div class="result" id="gearContent3">...</div>
+  </div>
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+    const supabaseUrl = 'https://ddmjevqneetbmahtcqdl.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkbWpldnFuZWV0Ym1haHRjcWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5NzM5MTksImV4cCI6MjA3ODU0OTkxOX0.L63jZ8n7MjsTuGaNYYyRWvxOM-gzYlFzIMuZ4gvgHrk';
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    const targetBlader = "ベイメット";
+
+    async function calcResults() {
+      const winDisplay = document.getElementById("winCount");
+      const loseDisplay = document.getElementById("loseCount");
+      const drawDisplay = document.getElementById("drawCount");
+      const winPointsDisplay = document.getElementById("winPoints");
+      const losePointsDisplay = document.getElementById("losePoints");
+      const diffPointsDisplay = document.getElementById("diffPoints");
+      const lWinRateDisplay = document.getElementById("lWinRate");
+      const rWinRateDisplay = document.getElementById("rWinRate");
+
+      const { data, error } = await supabase.from("ResultDB").select("*");
+      if (error) {
+        console.error(error);
+        winDisplay.textContent = loseDisplay.textContent = drawDisplay.textContent = "ERR";
+        lWinRateDisplay.textContent = rWinRateDisplay.textContent = "ERR";
+        return;
+      }
+
+      // 勝敗判定用：相手ごとの合計
+      const opponents = {};
+      let totalWinPoints = 0, totalLosePoints = 0, totalDiff = 0;
+
+      // L/Rサイド勝率用
+      let lWins = 0, lTotal = 0;
+      let rWins = 0, rTotal = 0;
+
+      data.forEach(row => {
+        const { LBlader, RBlader, LPoint, RPoint } = row;
+        if (typeof LPoint !== "number" || typeof RPoint !== "number") return;
+
+        let opponentName, myPoint, oppPoint, isLeft = false;
+
+        if (LBlader === targetBlader) {
+          opponentName = RBlader;
+          myPoint = LPoint;
+          oppPoint = RPoint;
+          isLeft = true;
+          lTotal++;
+        } else if (RBlader === targetBlader) {
+          opponentName = LBlader;
+          myPoint = RPoint;
+          oppPoint = LPoint;
+          isLeft = false;
+          rTotal++;
+        } else return;
+
+        // 相手別合計（勝敗判定用）
+        if (!opponents[opponentName]) opponents[opponentName] = { myTotal: 0, oppTotal: 0 };
+        opponents[opponentName].myTotal += myPoint;
+        opponents[opponentName].oppTotal += oppPoint;
+
+        // 1レコードごとの得点/失点
+        if (myPoint > oppPoint) totalWinPoints += myPoint;
+        else if (myPoint < oppPoint) totalLosePoints += myPoint;
+
+        // L/Rサイド勝率
+        if (isLeft && myPoint > oppPoint) lWins++;
+        if (!isLeft && myPoint > oppPoint) rWins++;
+      });
+
+      totalDiff = totalWinPoints + totalLosePoints;
+
+      // 相手別合計で勝敗判定
+      let wins = 0, losses = 0, draws = 0;
+      Object.values(opponents).forEach(r => {
+        if (r.myTotal > r.oppTotal) wins++;
+        else if (r.myTotal < r.oppTotal) losses++;
+        else draws++;
+      });
+
+      winDisplay.textContent = wins;
+      loseDisplay.textContent = losses;
+      drawDisplay.textContent = draws;
+      winPointsDisplay.textContent = totalWinPoints;
+      losePointsDisplay.textContent = totalLosePoints;
+      diffPointsDisplay.textContent = totalDiff >= 0 ? `+${totalDiff}` : totalDiff;
+      lWinRateDisplay.textContent = lTotal ? `${((lWins / lTotal) * 100).toFixed(1)}%` : "-";
+      rWinRateDisplay.textContent = rTotal ? `${((rWins / rTotal) * 100).toFixed(1)}%` : "-";
+
+        // --- Gearカード ---
+      const { data: userData, error: userError } = await supabase
+        .from("UserDB")
+        .select("Name, Blade1, Ratchet1, Bit1, Blade2, Ratchet2, Bit2, Blade3, Ratchet3, Bit3")
+        .eq("Name", targetBlader)
+        .single();
+
+      if (userError || !userData) {
+        console.error("UserDB取得エラー:", userError);
+        for (let i = 1; i <=3; i++) {
+          document.getElementById(`gearTitle${i}`).textContent = "ERR";
+          document.getElementById(`gearContent${i}`).textContent = "";
+        }
+        return;
+      }
+
+        for (let i = 1; i <= 3; i++) {
+        const blade = userData[`Blade${i}`];
+        const ratchet = userData[`Ratchet${i}`];
+        const bit = userData[`Bit${i}`];
+        const title = `${blade} ${ratchet} ${bit}`;
+        document.getElementById(`gearTitle${i}`).textContent = title;
+
+        // 該当ギアの試合を抽出
+        const relevantMatches = data.filter(row => {
+            if (row.LBlader === targetBlader) {
+                return row.LBey === title;
+            } else if (row.RBlader === targetBlader) {
+                return row.RBey === title;
+            }
+            return false;
+        });
+
+
+        let wins = 0, total = relevantMatches.length;
+        let points = 0, negPoints = 0;
+
+        relevantMatches.forEach(row => {
+            const myPoint = row.LBlader === targetBlader ? row.LPoint : row.RPoint;
+            const oppPoint = row.LBlader === targetBlader ? row.RPoint : row.LPoint;
+
+            if (myPoint > oppPoint) wins++;
+            if (myPoint > 0) points += myPoint;
+            if (myPoint < 0) negPoints += myPoint;
+        });
+
+        const winRate = total ? ((wins / total) * 100).toFixed(1) + "%" : "-";
+        document.getElementById(`gearContent${i}`).textContent =
+            ` 勝率: ${winRate}, 得点: ${points}, 失点: ${negPoints}`;
+        }
+
+    }
+
+    calcResults();
+  </script>
+</body>
+</html>
