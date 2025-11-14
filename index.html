@@ -1,227 +1,603 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>ブレーダー勝敗集計</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Gearカード（開閉式）</title>
   <style>
-    @font-face {
-      font-family: 'CyberFont';
-      src: url('./madoufmg.ttf') format('truetype');
+    /* --- 全体 --- */
+    :root{
+      --bg:#ffffff;
+      --text:#111;
+      --accent:#00FFF0;
+      --danger:#C00000;
+      --muted: rgba(0,0,0,0.5);
+      --card-bg: #fff;
+      --card-border: rgba(0,0,0,0.06);
+      --color: #fff;
     }
     body {
-      background: #111;
+      background: url('BackImage.png') no-repeat center center fixed;
+      background-size: cover;
+      color: var(--text);
+      font-family: "Noto Sans JP", "Yu Gothic", sans-serif;
+      padding: 18px;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #fff; /* 文字色を白に */
+    }
+
+    .page-header .header-icon {
+      width: 40px;
+      height: 40px;
+    }
+
+    .page-header .header-title {
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    /* --- Top info (画像＋タイトル＋勝率等) --- */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 14px;
+      
+      /* 背景 */
+      background: rgba(0, 0, 0, 0.4); /* 黒半透明 */
+      backdrop-filter: blur(1px);      /* ガウスぼかし */
+      border-radius: 12px;             /* 角丸 */
+      padding: 12px;
       color: #fff;
-      font-family: 'CyberFont', sans-serif;
-      text-align: center;
-      padding-top: 0px;
     }
-    .card {
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.1);
-      border-radius: 12px;
-      padding: 20px;
-      width: 100%;
-      margin: 20px auto;
-      box-shadow: 0 0 10px rgba(0,255,255,0.2);
+    .header .blade-name,
+    .header .blade-spec,
+    .header .big-rate,
+    .header .small-stats {
+      color: #fff;
     }
-    .title { font-size: 22px; margin-bottom: 8px; }
-    .result { display: flex; justify-content: space-around; margin-top: 15px;}
-    .section { display: flex; flex-direction: column; align-items: center; }
-    .count { font-size: 50px; font-weight: bold; margin-bottom: 6px; }
-    .sub { font-size: 32px; opacity: 0.8; }
-    .win { color: cyan; }
-    .lose { color: pink; }
-    .draw { color: orange; }
+
+
+    .blade-image {
+      width:72px;
+      height:72px;
+      border-radius:12px;
+      background:#f4f4f4;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.08);
+      flex-shrink:0;
+      
+    }
+    .blade-image img{ width:100%; height:100%; object-fit:cover; }
+
+    .head-main {
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+    }
+    .title-row {
+      display:flex;
+      align-items:flex-end;
+      gap:8px;
+      
+    }
+    .blade-name {
+      font-weight:800;
+      font-size:20px;
+      letter-spacing:0.3px;
+      
+    }
+    .blade-spec {
+      color:var(--muted);
+      font-size:14px;
+      
+    }
+
+    .stats-row {
+      display:flex;
+      gap:18px;
+      align-items:center;
+      margin-top:2px;
+    }
+    .big-rate {
+      font-size:28px;
+      font-weight:800;
+      color:var(--text);
+    }
+    .small-stats { font-size:12px; color:var(--muted); }
+
+    /* --- Card container --- */
+    .gear-cards {
+      margin-top:12px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      max-width:520px;
+    }
+    .gear-card {
+      background: rgba(0, 0, 0, 0.6); /* 黒半透明 */
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 8px;
+      padding: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(1px);
+      color: #fff; /* 文字色を白に変更 */
+    }
+    .gear-card .gear-title,
+    .gear-card .gear-sub,
+    .gear-card .gear-sub .value,
+    .gear-card .gear-sub .label,
+    .gear-card .gear-thumb,
+    .gear-card .finish-text,
+    .gear-card .finish-label,
+    .gear-card .bar-win,
+    .gear-card .bar-lose {
+      color: #fff;
+    }
+    .gear-card .gear-sub .label,
+    .gear-card .gear-sub span#gearPointsVal1,
+    .gear-card .gear-sub span#gearNegPointsVal1 {
+      color: rgba(255,255,255,0.8); /* 少し薄めの白 */
+    }
+
+    .gear-head {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .gear-head-left {
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex:1;
+    }
+    .gear-head .gear-winrate {
+      font-size: 20px; /* 大きく表示 */
+      font-weight: 800;
+      color: var(--text);
+      margin-left: auto; /* 右端に表示したい場合 */
+    }
+
+    .gear-thumb {
+      width:44px; height:44px; border-radius:6px; overflow:hidden; background:#fafafa; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .gear-thumb img{ width:100%; height:100%; object-fit:cover; }
+
+    .gear-title {
+      font-weight:800;
+      font-size:18px;
+    }
+    .gear-sub {
+      font-size:14px;
+      color:var(--muted);
+      margin-top:2px;
+    }
+      .gear-sub .label {
+      font-size:12px;       /* ラベルは小さめ */
+      color:var(--muted);
+      margin-right:2px;
+    }
+
+    .gear-sub .value {
+      font-size:18px;       /* gear-title と同じ大きさ */
+      font-weight:800;
+      color:var(--text);
+      margin-right:8px;
+    }
+
+    .gear-sub span#gearPointsVal1,
+    .gear-sub span#gearNegPointsVal1 {
+      font-size:12px;       /* 得点/失点は小さいまま */
+      color:var(--muted);
+      margin-left:4px;
+    }
+
+
+    .caret {
+      transition: transform .28s ease;
+      width:18px; height:18px; display:inline-block;
+    }
+    .gear-card.open .caret { transform: rotate(180deg); }
+
+    /* --- expandable content --- */
+    .gear-body {
+      margin-top:10px;
+      overflow:hidden;
+      max-height:0;
+      transition: max-height .32s ease, opacity .22s ease;
+      opacity:0;
+    }
+    .gear-card.open .gear-body {
+      opacity:1;
+      max-height: 420px; /* enough for content */
+    }
+
+    /* --- top summary inside card --- */
+    .gear-summary {
+      display:flex;
+      align-items:center;
+      gap:12px;
+      margin-bottom:8px;
+    }
+    .gear-summary .rate {
+      font-size:20px;
+      font-weight:800;
+      color:var(--text);
+      min-width:86px;
+    }
+    .gear-summary .points {
+      font-size:13px;
+      color:var(--muted);
+    }
+
+    /* --- Finish bars --- */
+    .finish-block {
+      width:100%;
+      margin-top:6px;
+      padding-right:4px;
+    }
+    .finish-row {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin:1px 0;
+    }
+    .finish-label {
+      width:42px;
+      font-size:20px;
+      font-weight:800;
+      letter-spacing:0.5px;
+    }
+    .finish-text {
+      width:84px;
+      font-size:14px;
+      text-align:right;
+      color:var(--text);
+      flex-shrink:0;
+    }
+    .finish-pair {
+      display: flex;
+      flex-direction: column;
+      gap: 0; /* win/loseバーの間隔をゼロにする */
+      margin-bottom: 5px; /* ペア間のスペース */
+    }
+
+    .finish-row {
+      display:flex;
+      align-items:center;
+      gap:5px;
+      margin:0;
+    }
+
+
+    .bar-container {
+      flex:1;
+      height:16px;
+      background: rgba(0,0,0,0.06);
+      border-radius:6px;
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+    }
+    .bar-win { height:100%; background:var(--accent); transition:width .4s ease; }
+    .bar-lose { height:100%; background:var(--danger); transition:width .4s ease; }
+
+    /* small screens */
+    @media (max-width:520px){
+      .gear-cards{ max-width:100%; }
+      .blade-image{ width:56px; height:56px; }
+    }
   </style>
 </head>
 <body>
-  <!-- 総合勝敗カード -->
-  <div class="card">
-    <div class="title">ブレーダー名：<span id="bladerName">ベイメット</span></div>
-    <div class="result">
-      <div class="section">
-        <div>勝ち</div>
-        <div class="count win" id="winCount">...</div>
-        <div class="sub">得点 <span id="winPoints">0</span></div>
+  <div class="page-header">
+    <img src="BeyMetCupIcon.png" alt="BeyMetCup" class="header-icon">
+    <span class="header-title">2025.11.16 BEYMETCUP 100戦杯</span>
+  </div>
+  <div class="header">
+    <div class="blade-image" id="bladeImage">
+    </div>
+    <div class="head-main">
+      <div class="title-row">
+        <div class="blade-name" id="bladeTitle">---</div>
+        <div class="blade-spec" id="bladeSpec">---</div>
       </div>
-      <div class="section">
-        <div>負け</div>
-        <div class="count lose" id="loseCount">...</div>
-        <div class="sub">失点 <span id="losePoints">0</span></div>
-      </div>
-      <div class="section">
-        <div>引き分け</div>
-        <div class="count draw" id="drawCount">...</div>
-        <div class="sub">得失点差 <span id="diffPoints">0</span></div>
+      <div class="stats-row">
+        <div class="big-rate" id="overallRate">-</div>
+        <div class="small-stats">
+          <div>得点: <span id="totalPoints">0</span>　失点: <span id="totalNegPoints">0</span></div>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- L/Rサイド勝率カード -->
-  <div class="card">
-    <div class="result">
-      <div class="section">
-        <div>Lサイド勝率</div>
-        <div class="count win" id="lWinRate">...</div>
+  <div class="gear-cards">
+    <div class="gear-card" id="gearCard1">
+      <div class="gear-head" data-index="1">
+        <div class="gear-head-left">
+          <div class="gear-thumb" id="gearThumb1"></div>
+          <div>
+            <div class="gear-title" id="gearTitle1">...</div>
+            <div class="gear-sub" id="gearSub1">
+              <span class="label">勝率:</span>
+              <span class="value" id="gearWinRateVal1">-</span>
+              <span class="label">得点:</span>
+              <span id="gearPointsVal1">0</span>
+              <span class="label">失点:</span>
+              <span id="gearNegPointsVal1">0</span>
+            </div>
+          </div>
+        </div>
+        <div class="caret">▼</div>
       </div>
-      <div class="section">
-        <div>Rサイド勝率</div>
-        <div class="count win" id="rWinRate">...</div>
+      <div class="gear-body" id="gearBody1">
+        <div class="finish-block" id="finishBlock1"></div>
+      </div>
+    </div>
+
+    <div class="gear-card" id="gearCard2">
+      <div class="gear-head" data-index="2">
+        <div class="gear-head-left">
+          <div class="gear-thumb" id="gearThumb2"></div>
+          <div>
+            <div class="gear-title" id="gearTitle2">...</div>
+            <div class="gear-sub" id="gearSub2">
+              <span class="label">勝率:</span>
+              <span class="value" id="gearWinRateVal2">-</span>
+              <span class="label">得点:</span>
+              <span id="gearPointsVal2">0</span>
+              <span class="label">失点:</span>
+              <span id="gearNegPointsVal2">0</span>
+            </div>
+          </div>
+        </div>
+        <div class="caret">▼</div>
+      </div>
+      <div class="gear-body" id="gearBody2">
+        <div class="finish-block" id="finishBlock2"></div>
+      </div>
+    </div>
+
+    <div class="gear-card" id="gearCard3">
+      <div class="gear-head" data-index="3">
+        <div class="gear-head-left">
+          <div class="gear-thumb" id="gearThumb3"></div>
+          <div>
+            <div class="gear-title" id="gearTitle3">...</div>
+            <div class="gear-sub" id="gearSub3">
+              <span class="label">勝率:</span>
+              <span class="value" id="gearWinRateVal3">-</span>
+              <span class="label">得点:</span>
+              <span id="gearPointsVal3">0</span>
+              <span class="label">失点:</span>
+              <span id="gearNegPointsVal3">0</span>
+            </div>
+          </div>
+        </div>
+        <div class="caret">▼</div>
+      </div>
+      <div class="gear-body" id="gearBody3">
+        <div class="finish-block" id="finishBlock3"></div>
       </div>
     </div>
   </div>
-  <!-- Gearカード -->
-  <div class="card">
-    <div class="title" id="gearTitle1">...</div>
-    <div class="result" id="gearContent1">...</div>
-  </div>
-  <div class="card">
-    <div class="title" id="gearTitle2">...</div>
-    <div class="result" id="gearContent2">...</div>
-  </div>
-  <div class="card">
-    <div class="title" id="gearTitle3">...</div>
-    <div class="result" id="gearContent3">...</div>
-  </div>
+
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
     const supabaseUrl = 'https://ddmjevqneetbmahtcqdl.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkbWpldnFuZWV0Ym1haHRjcWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5NzM5MTksImV4cCI6MjA3ODU0OTkxOX0.L63jZ8n7MjsTuGaNYYyRWvxOM-gzYlFzIMuZ4gvgHrk';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const targetBlader = "ベイメット";
 
-    async function calcResults() {
-      const winDisplay = document.getElementById("winCount");
-      const loseDisplay = document.getElementById("loseCount");
-      const drawDisplay = document.getElementById("drawCount");
-      const winPointsDisplay = document.getElementById("winPoints");
-      const losePointsDisplay = document.getElementById("losePoints");
-      const diffPointsDisplay = document.getElementById("diffPoints");
-      const lWinRateDisplay = document.getElementById("lWinRate");
-      const rWinRateDisplay = document.getElementById("rWinRate");
+    const finishMap = {
+      "Spin": "SF",
+      "Burst": "BF",
+      "Orver": "OF",
+      "Xtreme": "XF"
+    };
 
-      const { data, error } = await supabase.from("ResultDB").select("*");
+    // 開閉処理（delegate）
+    document.addEventListener('click', (e) => {
+      const head = e.target.closest('.gear-head');
+      if (!head) return;
+      const card = head.closest('.gear-card');
+      card.classList.toggle('open');
+    });
+
+    async function calcResults() {
+      // 画面要素
+      const bladeTitle = document.getElementById('bladeTitle');
+      const bladeSpec = document.getElementById('bladeSpec');
+      const bladeImage = document.getElementById('bladeImage');
+
+      const totalPointsEl = document.getElementById('totalPoints');
+      const totalNegPointsEl = document.getElementById('totalNegPoints');
+      const overallRateEl = document.getElementById('overallRate');
+
+      // fetch ResultDB
+      const { data, error } = await supabase.from('ResultDB').select('*');
       if (error) {
-        console.error(error);
-        winDisplay.textContent = loseDisplay.textContent = drawDisplay.textContent = "ERR";
-        lWinRateDisplay.textContent = rWinRateDisplay.textContent = "ERR";
+        console.error('ResultDB fetch error', error);
         return;
       }
+      const rows = data || [];
 
-      // 勝敗判定用：相手ごとの合計
+      // overall集計（相手ごと合算）
       const opponents = {};
-      let totalWinPoints = 0, totalLosePoints = 0, totalDiff = 0;
+      let totalWinPoints = 0, totalLosePoints = 0;
+      let lWins=0, lTotal=0, rWins=0, rTotal=0;
 
-      // L/Rサイド勝率用
-      let lWins = 0, lTotal = 0;
-      let rWins = 0, rTotal = 0;
-
-      data.forEach(row => {
+      rows.forEach(row => {
         const { LBlader, RBlader, LPoint, RPoint } = row;
-        if (typeof LPoint !== "number" || typeof RPoint !== "number") return;
+        if (typeof LPoint !== 'number' || typeof RPoint !== 'number') return;
 
-        let opponentName, myPoint, oppPoint, isLeft = false;
+        let isLeft=false, myPoint, oppPoint, opponent;
+        if (LBlader === targetBlader) { isLeft=true; myPoint=LPoint; oppPoint=RPoint; opponent=RBlader; lTotal++; }
+        else if (RBlader === targetBlader) { isLeft=false; myPoint=RPoint; oppPoint=LPoint; opponent=LBlader; rTotal++; }
+        else return;
 
-        if (LBlader === targetBlader) {
-          opponentName = RBlader;
-          myPoint = LPoint;
-          oppPoint = RPoint;
-          isLeft = true;
-          lTotal++;
-        } else if (RBlader === targetBlader) {
-          opponentName = LBlader;
-          myPoint = RPoint;
-          oppPoint = LPoint;
-          isLeft = false;
-          rTotal++;
-        } else return;
+        if (!opponents[opponent]) opponents[opponent] = { myTotal:0, oppTotal:0 };
+        opponents[opponent].myTotal += myPoint;
+        opponents[opponent].oppTotal += oppPoint;
 
-        // 相手別合計（勝敗判定用）
-        if (!opponents[opponentName]) opponents[opponentName] = { myTotal: 0, oppTotal: 0 };
-        opponents[opponentName].myTotal += myPoint;
-        opponents[opponentName].oppTotal += oppPoint;
-
-        // 1レコードごとの得点/失点
         if (myPoint > oppPoint) totalWinPoints += myPoint;
         else if (myPoint < oppPoint) totalLosePoints += myPoint;
 
-        // L/Rサイド勝率
         if (isLeft && myPoint > oppPoint) lWins++;
         if (!isLeft && myPoint > oppPoint) rWins++;
       });
 
-      totalDiff = totalWinPoints + totalLosePoints;
+      // overall win rate display (as percentage of side wins)
+      const overallRate = (() => {
+        const totalMatches = lTotal + rTotal;
+        const totalWins = Object.values(opponents).reduce((acc, v) => acc + (v.myTotal > v.oppTotal ? 1 : 0), 0);
+        return totalMatches ? `${((totalWins / Object.keys(opponents).length) * 100).toFixed(1)}%` : '-';
+      })();
 
-      // 相手別合計で勝敗判定
-      let wins = 0, losses = 0, draws = 0;
-      Object.values(opponents).forEach(r => {
-        if (r.myTotal > r.oppTotal) wins++;
-        else if (r.myTotal < r.oppTotal) losses++;
-        else draws++;
-      });
+      bladeTitle.textContent = targetBlader;
+      bladeSpec.textContent = ''; // 追加情報あれば入れる
+      overallRateEl.textContent = overallRate;
+      totalPointsEl.textContent = totalWinPoints;
+      totalNegPointsEl.textContent = totalLosePoints;
 
-      winDisplay.textContent = wins;
-      loseDisplay.textContent = losses;
-      drawDisplay.textContent = draws;
-      winPointsDisplay.textContent = totalWinPoints;
-      losePointsDisplay.textContent = totalLosePoints;
-      diffPointsDisplay.textContent = totalDiff >= 0 ? `+${totalDiff}` : totalDiff;
-      lWinRateDisplay.textContent = lTotal ? `${((lWins / lTotal) * 100).toFixed(1)}%` : "-";
-      rWinRateDisplay.textContent = rTotal ? `${((rWins / rTotal) * 100).toFixed(1)}%` : "-";
-
-        // --- Gearカード ---
+      // --- UserDB から gear 情報を取得 ---
       const { data: userData, error: userError } = await supabase
-        .from("UserDB")
-        .select("Name, Blade1, Ratchet1, Bit1, Blade2, Ratchet2, Bit2, Blade3, Ratchet3, Bit3")
-        .eq("Name", targetBlader)
+        .from('UserDB')
+        .select('Name, Blade1, Ratchet1, Bit1, Blade2, Ratchet2, Bit2, Blade3, Ratchet3, Bit3')
+        .eq('Name', targetBlader)
         .single();
 
       if (userError || !userData) {
-        console.error("UserDB取得エラー:", userError);
-        for (let i = 1; i <=3; i++) {
-          document.getElementById(`gearTitle${i}`).textContent = "ERR";
-          document.getElementById(`gearContent${i}`).textContent = "";
-        }
+        console.error('UserDB取得エラー', userError);
         return;
       }
 
-        for (let i = 1; i <= 3; i++) {
-        const blade = userData[`Blade${i}`];
-        const ratchet = userData[`Ratchet${i}`];
-        const bit = userData[`Bit${i}`];
-        const title = `${blade} ${ratchet} ${bit}`;
-        document.getElementById(`gearTitle${i}`).textContent = title;
+      // 各 gear を処理
+      for (let i = 1; i <= 3; i++) {
+        const blade = userData[`Blade${i}`] || '';
+        const ratchet = userData[`Ratchet${i}`] || '';
+        const bit = userData[`Bit${i}`] || '';
+        const title = `${blade} ${ratchet} ${bit}`.trim();
 
-        // 該当ギアの試合を抽出
-        const relevantMatches = data.filter(row => {
-            if (row.LBlader === targetBlader) {
-                return row.LBey === title;
-            } else if (row.RBlader === targetBlader) {
-                return row.RBey === title;
+        // Update header
+        document.getElementById(`gearTitle${i}`).textContent = title || '(未設定)';
+        document.getElementById(`gearWinRateVal${i}`).textContent = '-';
+        document.getElementById(`gearPointsVal${i}`).textContent = '0';
+        document.getElementById(`gearNegPointsVal${i}`).textContent = '0';
+
+        // BladeDB からサムネ（Image）を取得
+        const thumbEl = document.getElementById(`gearThumb${i}`);
+        thumbEl.innerHTML = ''; // clear
+        if (blade) {
+          try {
+            const { data: bladeImgData } = await supabase
+              .from('BladeDB')
+              .select('Image')
+              .eq('BladeName', blade)
+              .single();
+
+            const imgUrl = bladeImgData && bladeImgData.Image ? bladeImgData.Image : null;
+            if (imgUrl) {
+              thumbEl.innerHTML = `<img src="${imgUrl}" alt="${blade}">`;
+            } else {
+              thumbEl.textContent = '–';
             }
-            return false;
-        });
-
-
-        let wins = 0, total = relevantMatches.length;
-        let points = 0, negPoints = 0;
-
-        relevantMatches.forEach(row => {
-            const myPoint = row.LBlader === targetBlader ? row.LPoint : row.RPoint;
-            const oppPoint = row.LBlader === targetBlader ? row.RPoint : row.LPoint;
-
-            if (myPoint > oppPoint) wins++;
-            if (myPoint > 0) points += myPoint;
-            if (myPoint < 0) negPoints += myPoint;
-        });
-
-        const winRate = total ? ((wins / total) * 100).toFixed(1) + "%" : "-";
-        document.getElementById(`gearContent${i}`).textContent =
-            ` 勝率: ${winRate}, 得点: ${points}, 失点: ${negPoints}`;
+          } catch (err) {
+            console.warn('Blade image fetch fail', err);
+            thumbEl.textContent = '–';
+          }
+        } else {
+          thumbEl.textContent = '–';
         }
 
-    }
+        // 該当ギアの試合抽出
+        const relevantMatches = rows.filter(row => {
+          if (row.LBlader === targetBlader) return row.LBey === title;
+          if (row.RBlader === targetBlader) return row.RBey === title;
+          return false;
+        });
+
+        // 基本統計
+        let wins=0, points=0, negPoints=0;
+        const finishStats = { SF:{win:0,lose:0}, BF:{win:0,lose:0}, OF:{win:0,lose:0}, XF:{win:0,lose:0} };
+
+        relevantMatches.forEach(row => {
+          const isLeft = row.LBlader === targetBlader;
+          const myPoint = isLeft ? row.LPoint : row.RPoint;
+          const oppPoint = isLeft ? row.RPoint : row.LPoint;
+
+          if (myPoint > oppPoint) wins++;
+          if (myPoint > 0) points += myPoint;
+          if (myPoint < 0) negPoints += myPoint;
+
+          const rawFin = row.Finish;
+          const finKey = finishMap[rawFin];
+          if (!finKey) return;
+          if (myPoint > oppPoint) finishStats[finKey].win++;
+          else if (myPoint < oppPoint) finishStats[finKey].lose++;
+        });
+
+        // 勝率
+        const totalMatches = relevantMatches.length;
+        const winRate = totalMatches ? `${((wins/totalMatches)*100).toFixed(1)}%` : '-';
+
+        // summary update
+        document.getElementById(`gearWinRateVal${i}`).textContent = winRate;
+        document.getElementById(`gearPointsVal${i}`).textContent = points;
+        document.getElementById(`gearNegPointsVal${i}`).textContent = negPoints;
+
+
+        // --- 横棒グラフ表示 ---
+        const finishBlock = document.getElementById(`finishBlock${i}`);
+        // find max for scaling
+        let maxCount = 0;
+        ['SF','BF','OF','XF'].forEach(k => {
+          maxCount = Math.max(maxCount, finishStats[k].win, finishStats[k].lose);
+        });
+        if (maxCount === 0) maxCount = 1;
+
+        let html = '';
+        ['SF','BF','OF','XF'].forEach(k => {
+          const w = finishStats[k].win;
+          const l = finishStats[k].lose;
+          const winWidth = (w/maxCount)*100;
+          const loseWidth = (l/maxCount)*100;
+
+          html += `
+            <div class="finish-pair">
+              <div class="finish-row">
+                <div class="finish-label">${k}</div>
+                <div class="finish-text">win: ${w}</div>
+                <div class="bar-container">
+                  <div class="bar-win" style="width:${winWidth}%"></div>
+                </div>
+              </div>
+              <div class="finish-row">
+                <div class="finish-label"></div>
+                <div class="finish-text">lose: ${l}</div>
+                <div class="bar-container">
+                  <div class="bar-lose" style="width:${loseWidth}%"></div>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+        finishBlock.innerHTML = html;
+      } // end for each gear
+    } // end calcResults
 
     calcResults();
   </script>
