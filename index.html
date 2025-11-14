@@ -67,7 +67,7 @@
       width:72px;
       height:72px;
       border-radius:12px;
-      background:#f4f4f4;
+      background:transparent;
       display:flex;
       align-items:center;
       justify-content:center;
@@ -81,12 +81,13 @@
     .head-main {
       display:flex;
       flex-direction:column;
-      gap:6px;
+      gap:4px;
+      width: 100%;
     }
     .title-row {
-      display:flex;
-      align-items:flex-end;
-      gap:8px;
+      display: flex;
+      flex-direction: column; /* 横配置ではなく縦配置 */
+      width: 100%; 
       
     }
     .blade-name {
@@ -100,17 +101,29 @@
       font-size:14px;
       
     }
-
     .stats-row {
-      display:flex;
-      gap:18px;
-      align-items:center;
-      margin-top:2px;
+      display: flex;
+      align-items: flex-start; 
+      gap: 12px;
+      margin-top: 4px;
+      width: 100%;
     }
     .big-rate {
-      font-size:28px;
-      font-weight:800;
-      color:var(--text);
+      font-size: 28px; 
+      font-weight: 800;
+      color: var(--text);
+      flex-shrink: 0; 
+    }
+    .stats-right {
+      display: flex;
+      flex-direction: column; /* 2段に */
+      gap: 2px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .stats-right .side-rate {
+      display: flex;
+      justify-content: space-between;
     }
     .small-stats { font-size:12px; color:var(--muted); }
 
@@ -169,7 +182,7 @@
     }
 
     .gear-thumb {
-      width:44px; height:44px; border-radius:6px; overflow:hidden; background:#fafafa; flex-shrink:0;
+      width:44px; height:44px; border-radius:6px; overflow:hidden; background:transparent; flex-shrink:0;
       display:flex; align-items:center; justify-content:center;
     }
     .gear-thumb img{ width:100%; height:100%; object-fit:cover; }
@@ -253,18 +266,51 @@
       gap:8px;
       margin:1px 0;
     }
+    .finish-wrap {
+      display: flex;
+      align-items: flex-start;   /* 上揃え */
+      gap: 5px;          /* FINISH と WIN/LOSE の間隔 */
+    }
     .finish-label {
-      width:42px;
-      font-size:20px;
-      font-weight:800;
-      letter-spacing:0.5px;
+      font-size: 24px;    /* 大きいFINISH */
+      font-weight: 900;
+      color: #fff;
+      text-align: right;
+      width: 32px;
+    }
+    .win-row, .lose-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .result-small {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      flex: 1;
+    }
+    .win-label,
+    .lose-label {
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      padding: 4px 12px;
+      border-radius: 6px;
+      width: fit-content;
+    }
+    .win-label {
+      background: #4cb44c;
+    }
+
+    .lose-label {
+      background: #3c3c3c;
     }
     .finish-text {
-      width:84px;
-      font-size:14px;
-      text-align:right;
-      color:var(--text);
-      flex-shrink:0;
+      font-size: 12px;          /* 小さめ */
+      color: #fff;
+      min-width: 50px;
+      text-align: right;
+      padding-top: 2px;
     }
     .finish-pair {
       display: flex;
@@ -285,13 +331,33 @@
       flex:1;
       height:16px;
       background: rgba(0,0,0,0.06);
-      border-radius:6px;
+      border-radius:0;
       overflow:hidden;
       display:flex;
       align-items:center;
     }
-    .bar-win { height:100%; background:var(--accent); transition:width .4s ease; }
-    .bar-lose { height:100%; background:var(--danger); transition:width .4s ease; }
+    .bar-win {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(
+        to right,
+        rgba(0, 255, 192, 0) 0%,
+        rgba(0, 255, 192, 0.8) 100%
+      );
+      transition: width .4s ease;
+      border-radius: 0;        /* ← 角丸を無効化 */
+    }
+    .bar-lose {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(
+        to right,
+        rgba(192, 0, 0, 0) 0%,
+        rgba(192, 0, 0, 0.8) 100%
+      );
+      transition: width .4s ease;
+      border-radius: 0;        /* ← 角丸を無効化 */
+    }
 
     /* small screens */
     @media (max-width:520px){
@@ -303,7 +369,7 @@
 <body>
   <div class="page-header">
     <img src="BeyMetCupIcon.png" alt="BeyMetCup" class="header-icon">
-    <span class="header-title">2025.11.16 BEYMETCUP 100戦杯</span>
+    <span class="header-title">BEYMETCUP 100戦杯</span>
   </div>
   <div class="header">
     <div class="blade-image" id="bladeImage">
@@ -317,6 +383,10 @@
         <div class="big-rate" id="overallRate">-</div>
         <div class="small-stats">
           <div>得点: <span id="totalPoints">0</span>　失点: <span id="totalNegPoints">0</span></div>
+        </div>
+        <div class="side-rate">
+          <span>L勝率: <span id="lSideRate">-</span></span>
+          <span>R勝率: <span id="rSideRate">-</span></span>
         </div>
       </div>
     </div>
@@ -439,6 +509,7 @@
       const opponents = {};
       let totalWinPoints = 0, totalLosePoints = 0;
       let lWins=0, lTotal=0, rWins=0, rTotal=0;
+      let totalWins=0, totalLosses=0, totalDraws=0;
 
       rows.forEach(row => {
         const { LBlader, RBlader, LPoint, RPoint } = row;
@@ -458,8 +529,13 @@
 
         if (isLeft && myPoint > oppPoint) lWins++;
         if (!isLeft && myPoint > oppPoint) rWins++;
-      });
 
+        if (myPoint > oppPoint) totalWins++;
+        else if (myPoint < oppPoint) totalLosses++;
+        else totalDraws++;
+
+      });
+      
       // overall win rate display (as percentage of side wins)
       const overallRate = (() => {
         const totalMatches = lTotal + rTotal;
@@ -468,10 +544,11 @@
       })();
 
       bladeTitle.textContent = targetBlader;
-      bladeSpec.textContent = ''; // 追加情報あれば入れる
+      bladeSpec.textContent = `勝: ${totalWins} / 敗: ${totalLosses} / 引き分け: ${totalDraws}`;
       overallRateEl.textContent = overallRate;
       totalPointsEl.textContent = totalWinPoints;
       totalNegPointsEl.textContent = totalLosePoints;
+
 
       // --- UserDB から gear 情報を取得 ---
       const { data: userData, error: userError } = await supabase
@@ -577,24 +654,26 @@
           const loseWidth = (l/maxCount)*100;
 
           html += `
-            <div class="finish-pair">
-              <div class="finish-row">
-                <div class="finish-label">${k}</div>
-                <div class="finish-text">win: ${w}</div>
-                <div class="bar-container">
-                  <div class="bar-win" style="width:${winWidth}%"></div>
+            <div class="finish-wrap">
+              <div class="finish-label">${k}</div>
+              <div class="result-small">
+                <div class="win-row">
+                  <div class="finish-text">WIN: ${w}</div>
+                  <div class="bar-container">
+                    <div class="bar-win" style="width:${winWidth}%"></div>
+                  </div>
                 </div>
-              </div>
-              <div class="finish-row">
-                <div class="finish-label"></div>
-                <div class="finish-text">lose: ${l}</div>
-                <div class="bar-container">
-                  <div class="bar-lose" style="width:${loseWidth}%"></div>
+                <div class="lose-row">
+                  <div class="finish-text">LOSE: ${l}</div>
+                  <div class="bar-container">
+                    <div class="bar-lose" style="width:${loseWidth}%"></div>
+                  </div>
                 </div>
               </div>
             </div>
           `;
         });
+
         finishBlock.innerHTML = html;
       } // end for each gear
     } // end calcResults
@@ -603,3 +682,4 @@
   </script>
 </body>
 </html>
+
