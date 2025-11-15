@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Gearカード（開閉式）</title>
+  <link rel="icon" type="image/png" href="BeyMetCupIcon.png">
+  <link rel="shortcut icon" type="image/png" href="BeyMetCupIcon.png">
+  <title>100戦杯リザルト</title>
   <style>
     /* --- 全体 --- */
     :root{
@@ -493,7 +495,24 @@
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkbWpldnFuZWV0Ym1haHRjcWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5NzM5MTksImV4cCI6MjA3ODU0OTkxOX0.L63jZ8n7MjsTuGaNYYyRWvxOM-gzYlFzIMuZ4gvgHrk';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const targetBlader = "ベイメット";
+    const urlParams = new URLSearchParams(window.location.search);
+    const inputPassword = urlParams.get('id'); 
+    let targetBlader = '-'; 
+
+    if (inputPassword) {
+      const { data: userData, error } = await supabase
+        .from('UserDB')
+        .select('Name')
+        .eq('Password', inputPassword)
+        .single(); // 1件だけ取得
+
+      if (userData && userData.Name) {
+        targetBlader = userData.Name;
+      } else {
+        console.warn('該当するユーザーがいません');
+      }
+    }
+
 
     const finishMap = {
       "Spin": "SF",
