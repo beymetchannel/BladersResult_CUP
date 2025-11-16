@@ -732,89 +732,165 @@ calcResults();
 
 
 async function calcRanking(myName) {
-
   // UserDB から全ブレーダー一覧取得
-  const { data: userList } = await supabase
+  const { data: userList, error: userListErr } = await supabase
     .from("UserDB")
     .select("Name");
 
-  const allUsers = userList.map(u => u.Name);
+  if (userListErr) {
+    console.error('UserDB fetch error', userListErr);
+    return;
+  }
+  const allUsers = (userList || []).map(u => u.Name);
 
   // ResultDB の全バトルデータ取得
-  const { data: battleList } = await supabase
+  const { data: battleList = [], error: battleErr } = await supabase
     .from("ResultDB")
     .select("*");
 
-  // 勝敗集計用オブジェクト
-  let stats = {};
+  if (battleErr) {
+    console.error('ResultDB fetch error', battleErr);
+    return;
+  }
 
-  // 初期化（全ユーザー勝率0スタート）
-  allUsers.forEach(name => {
-    stats[name] = {
-      win: 0,
-      lose: 0,
-      draw: 0
-    };
-  });
+  // 基礎集計用データ構造
+  const stats = {}; // goals を入れておく（表示用）
+  const opponentsMap = {}; // opponentsMap[player][opponent] = { myTotal, oppTotal }
 
-  // バトルごとに勝敗計算（あなたが言った「スコア合計で判定」）
+  function ensurePlayer(p) {
+    if (!stats[p]) stats[p] = { goalsFor:0, goalsAgainst:0 };
+    if (!opponentsMap[p]) opponentsMap[p] = {};
+  }
+
+  // 全試合を走査して得点集計 + 対戦相手ごとの合算値を作る
   battleList.forEach(b => {
     const L = b.LBlader;
     const R = b.RBlader;
+    const Lscore = typeof b.LPoint === 'number' ? b.LPoint : 0;
+    const Rscore = typeof b.RPoint === 'number' ? b.RPoint : 0;
 
-    const Lscore = b.LPoint || 0;
-    const Rscore = b.RPoint || 0;
+    // プレイヤー確保
+    ensurePlayer(L);
+    ensurePlayer(R);
 
-    if (!stats[L] || !stats[R]) return;
+    // 総得点集計（レコード単位の合算）
+    stats[L].goalsFor += Lscore;
+    stats[L].goalsAgainst += Rscore;
+    stats[R].goalsFor += Rscore;
+    stats[R].goalsAgainst += Lscore;
 
-    if (Lscore > Rscore) {
-      stats[L].win++;
-      stats[R].lose++;
-    } else if (Rscore > Lscore) {
-      stats[R].win++;
-      stats[L].lose++;
-    } else {
-      stats[L].draw++;
-      stats[R].draw++;
-    }
+    // opponentsMap に該当ペアを追加/更新
+    if (!opponentsMap[L][R]) opponentsMap[L][R] = { myTotal:0, oppTotal:0 };
+    if (!opponentsMap[R][L]) opponentsMap[R][L] = { myTotal:0, oppTotal:0 };
+
+    // L 側の記録にこの試合の得点を加算（合算は myTotal と oppTotal）
+    opponentsMap[L][R].myTotal += Lscore;
+    opponentsMap[L][R].oppTotal += Rscore;
+
+    // R 側の記録は逆に加算
+    opponentsMap[R][L].myTotal += Rscore;
+    opponentsMap[R][L].oppTotal += Lscore;
   });
 
-  // 勝率計算
-  let rankingArray = allUsers.map(name => {
-    const st = stats[name];
-    const total = st.win + st.lose;
+  // opponentsMap を元に、各選手の勝/負/分を決定（相手ごとの合算で判定）
+  const finalStats = {}; // { win, lose, draw, goalsFor, goalsAgainst }
+  // 初期化（表示対象は UserDB 登録者に限定）
+  allUsers.forEach(name => {
+    finalStats[name] = { win:0, lose:0, draw:0, goalsFor: (stats[name]?.goalsFor || 0), goalsAgainst: (stats[name]?.goalsAgainst || 0) };
+  });
 
-    const rate = total === 0 ? 0 : st.win / total; // 勝率
+  // ただし opponentsMap に含まれる相手が UserDB にない場合でも、勝敗カウントの対象としたいなら
+  // allUsers のみを対象にしている点に注意（必要なら stats にある全キー基準に切替可能）
+  allUsers.forEach(player => {
+    const opponents = opponentsMap[player] || {};
+    Object.keys(opponents).forEach(opponent => {
+      // 対戦相手が UserDB に載っていない場合でも合算判定に含めたいならコメント外してください
+      // if (!finalStats[opponent]) return;
 
+      const pair = opponents[opponent];
+      const myTotal = pair.myTotal;
+      const oppTotal = pair.oppTotal;
+
+      if (myTotal > oppTotal) finalStats[player].win++;
+      else if (myTotal < oppTotal) finalStats[player].lose++;
+      else finalStats[player].draw++;
+    });
+  });
+
+  // ランキング配列作成
+  const rankingArray = allUsers.map(name => {
+    const fs = finalStats[name] || { win:0, lose:0, draw:0, goalsFor:0, goalsAgainst:0 };
+    const totalMatches = fs.win + fs.lose + fs.draw;
+    const winrate = totalMatches === 0 ? 0 : fs.win / totalMatches; // 勝 ÷ (勝+負+分)
+    const goalDiff = fs.goalsFor - fs.goalsAgainst;
     return {
-      name: name,
-      winrate: rate
+      name,
+      winrate,
+      goalDiff,
+      goalsFor: fs.goalsFor,
+      raw: fs
     };
   });
 
-  // 勝率降順にソート
-  rankingArray.sort((a, b) => b.winrate - a.winrate);
+  // ソート：①勝率降順 → ②得失点差降順 → ③総得点降順 → ④名前昇順
+  rankingArray.sort((a, b) => {
+    if (b.winrate !== a.winrate) return b.winrate - a.winrate;
+    if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
+    if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
+    return a.name.localeCompare(b.name);
+  });
 
-  // 自分が何位か取得
-  const myRank = rankingArray.findIndex(r => r.name === myName) + 1;
+  // 自分の順位表示
+  const myIndex = rankingArray.findIndex(r => r.name === myName);
+  const myRankText = myIndex === -1 ? '-' : String(myIndex + 1);
+  document.getElementById("rankingResult").textContent = myRankText;
 
-  // 出力
-  document.getElementById("rankingResult").textContent = `${myRank}`;
-  
-  
   const rankEl = document.getElementById("rankingResult");
-  const rankValue = Number(rankEl.textContent);
-
+  const rankValue = Number(myRankText);
   if (!isNaN(rankValue) && rankValue > 0 && rankValue <= 4) {
     rankEl.classList.add("rank-warning");
   } else {
     rankEl.classList.remove("rank-warning");
   }
+
+  // デバッグ出力（上位10 と 指定選手の詳細）
+  console.log('--- Top 10 Ranking ---');
+  console.log(rankingArray.slice(0,10).map((r,i) => ({
+    rank: i+1,
+    name: r.name,
+    winrate: (r.winrate*100).toFixed(1) + '%',
+    goalDiff: r.goalDiff,
+    goalsFor: r.goalsFor,
+    raw: r.raw
+  })));
+
+  const inspectNames = ['ゴジ太郎','よっしー'];
+  inspectNames.forEach(n => {
+    const e = rankingArray.find(r => r.name === n);
+    if (e) {
+      console.log('Inspect', n, {
+        win: e.raw.win,
+        lose: e.raw.lose,
+        draw: e.raw.draw,
+        totalMatches: e.raw.win + e.raw.lose + e.raw.draw,
+        winrate: (e.winrate*100).toFixed(1) + '%',
+        goalDiff: e.goalDiff,
+        goalsFor: e.goalsFor
+      });
+    } else {
+      console.log('Inspect:', n, '→ not found in UserDB');
+    }
+  });
 }
+
+
+
+
 calcRanking(targetBlader);
 
 
 </script>
 </body>
 </html>
+
 
