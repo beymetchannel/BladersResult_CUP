@@ -31,19 +31,20 @@
     }
 
     .page-header {
+      max-width:520px;
       display: flex;
-      
       gap: 12px;
       color: #fff; /* 文字色を白に */
-      
       font-size: 18px;
       font-weight: 700;
+      width: 100%;
+      margin: 0 auto; 
     }
     .header-title{
       display: flex;
       justify-content: center; 
-      text-align: center;
-      width:100%
+      text-align: center; 
+      width: 100%;
     }
 
     /* --- Top info (画像＋タイトル＋勝率等) --- */
@@ -56,8 +57,10 @@
       backdrop-filter: blur(2px); 
       border: 1px solid rgba(255, 255, 255, 0.3);
       border-radius: 8px;
-      padding: 12px;
+      padding: 12px 0;
       color: #fff;
+      width: 100%;
+      max-width:520px;
     }
     .header .blade-name,
     .header .blade-spec,
@@ -143,7 +146,7 @@
     .side-rate-row {
       font-size: 14px;
       display: flex;
-      gap: 8px;
+      gap: 2px;
     }
 
     /* --- Card container --- */
@@ -232,7 +235,7 @@
     .gear-sub span#gearNegPointsVal1 {
       font-size:14px;       /* 得点/失点は小さいまま */
       color:var(--muted);
-      margin-left:4px;
+      margin-left:0px;
       font-weight:800;
     }
 
@@ -892,5 +895,4 @@ calcRanking(targetBlader);
 </script>
 </body>
 </html>
-
 
