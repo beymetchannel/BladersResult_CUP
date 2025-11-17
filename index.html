@@ -651,18 +651,14 @@ async function calcResults() {
 
     const thumbEl = document.getElementById(`gearThumb${i}`);
     thumbEl.innerHTML = '';
+
     if (blade) {
-      try {
-        const { data: bladeImgData } = await supabase
-          .from('BladeDB')
-          .select('Image')
-          .eq('BladeName', blade)
-          .single();
-        const imgUrl = bladeImgData?.Image || null;
-        if (imgUrl) thumbEl.innerHTML = `<img src="${imgUrl}" alt="${blade}">`;
-        else thumbEl.textContent = '–';
-      } catch { thumbEl.textContent = '–'; }
-    } else thumbEl.textContent = '–';
+      const imgUrl = `https://beymetchannel.github.io/image-server/images/${blade}.png`;
+
+      thumbEl.innerHTML = `<img src="${imgUrl}" alt="${blade}">`;
+    } else {
+      thumbEl.textContent = '–';
+    }
 
     // 該当ギアの試合抽出
     const relevantMatches = rows.filter(row => {
@@ -867,5 +863,3 @@ calcRanking(targetBlader);
 </script>
 </body>
 </html>
-
-
