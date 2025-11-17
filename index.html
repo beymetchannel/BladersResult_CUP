@@ -856,34 +856,6 @@ async function calcRanking(myName) {
     rankEl.classList.remove("rank-warning");
   }
 
-  // デバッグ出力（上位10 と 指定選手の詳細）
-  console.log('--- Top 10 Ranking ---');
-  console.log(rankingArray.slice(0,10).map((r,i) => ({
-    rank: i+1,
-    name: r.name,
-    winrate: (r.winrate*100).toFixed(1) + '%',
-    goalDiff: r.goalDiff,
-    goalsFor: r.goalsFor,
-    raw: r.raw
-  })));
-
-  const inspectNames = ['ゴジ太郎','よっしー'];
-  inspectNames.forEach(n => {
-    const e = rankingArray.find(r => r.name === n);
-    if (e) {
-      console.log('Inspect', n, {
-        win: e.raw.win,
-        lose: e.raw.lose,
-        draw: e.raw.draw,
-        totalMatches: e.raw.win + e.raw.lose + e.raw.draw,
-        winrate: (e.winrate*100).toFixed(1) + '%',
-        goalDiff: e.goalDiff,
-        goalsFor: e.goalsFor
-      });
-    } else {
-      console.log('Inspect:', n, '→ not found in UserDB');
-    }
-  });
 }
 
 
@@ -895,4 +867,5 @@ calcRanking(targetBlader);
 </script>
 </body>
 </html>
+
 
