@@ -32,11 +32,15 @@
       --card-border: rgba(0,0,0,0.06);
       --color: #fff;
     }
+
+    html {
+      height: 100%; 
+    }
     body {
       background: url('BackImage.png') no-repeat center center fixed;
       background-size: cover;
       color: var(--text);
-      padding: 18px;
+      padding: 0;
       letter-spacing: -0.05px;
       font-family: "Noto Sans JP", "Yu Gothic", sans-serif;
     }
@@ -1401,11 +1405,8 @@ async function getMatchSummary(a, b) {
             // DBのLPointがbaseRBladerのスコアなので、rTotalPointsに加算
             rTotalPoints += Math.max(0, LPoint);
         }
-        // ただし、通常、このOR検索の結果はLBlader, RBladerの組み合わせが一定であるはずなので、
-        // 厳密にはここまでの条件分岐は不要かもしれませんが、安全のため残します。
     });
 
-    // DB上の LBlader と RBlader、およびその合計ポイントを返す
     return {
         LTotal: lTotalPoints,
         RTotal: rTotalPoints,
