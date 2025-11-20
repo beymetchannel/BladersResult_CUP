@@ -824,7 +824,7 @@
 
     const urlParams = new URLSearchParams(window.location.search);
     const inputPassword = urlParams.get('id'); 
-    let targetBlader = 'ヒリュー'; 
+    let targetBlader = '-'; 
 
     if (inputPassword) {
       const { data: userData, error } = await supabase
@@ -1427,5 +1427,6 @@ loadBladerList(targetBlader);
 </script>
 </body>
 </html>
+
 
 
