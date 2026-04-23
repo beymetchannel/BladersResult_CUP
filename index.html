@@ -696,6 +696,38 @@
     font-weight: 900;
 }
 
+/* --- ブレーダーアイコン（丸） --- */
+.blader-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(255,255,255,0.4);
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.3);
+}
+.blader-icon-sm {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.35);
+  vertical-align: middle;
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.3);
+}
+
+/* title-row をアイコン＋テキスト横並びに変更 */
+.title-row {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 10px;
+}
+.title-text {
+  display: flex;
+  flex-direction: column;
+}
+
   </style>
 </head>
 <body>
@@ -717,8 +749,11 @@
 
     <div class="head-main">
       <div class="title-row">
-        <div class="blade-name" id="bladeTitle">---</div>
-        <div class="blade-spec" id="bladeSpec">---</div>
+        <img id="bladerIconHeader" class="blader-icon" src="" alt="" onerror="this.style.display='none'">
+        <div class="title-text">
+          <div class="blade-name" id="bladeTitle">---</div>
+          <div class="blade-spec" id="bladeSpec">---</div>
+        </div>
       </div>
       <div class="stats-row">
         <div class="big-rate" id="overallRate">-</div>
@@ -818,25 +853,27 @@
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-    const supabaseUrl = 'https://ddmjevqneetbmahtcqdl.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRkbWpldnFuZWV0Ym1haHRjcWRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5NzM5MTksImV4cCI6MjA3ODU0OTkxOX0.L63jZ8n7MjsTuGaNYYyRWvxOM-gzYlFzIMuZ4gvgHrk';
+    const supabaseUrl = 'https://yyrsscvofuoufkujetgf.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cnNzY3ZvZnVvdWZrdWpldGdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMzIxMjksImV4cCI6MjA3OTYwODEyOX0.mNPIAGFKhJ65dsSllBprGYk3yZfnJXfYmDcdljW8xA4';
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const urlParams = new URLSearchParams(window.location.search);
-    const inputPassword = urlParams.get('id'); 
-    let targetBlader = '-'; 
+    const inputId = urlParams.get('id');
+    let targetBladerId = inputId || 'beymetsVnHY';
+    let targetBlader = ''; // 後で取得
 
-    if (inputPassword) {
-      const { data: userData, error } = await supabase
-        .from('UserDB')
-        .select('Name')
-        .eq('Password', inputPassword)
-        .single(); // 1件だけ取得
+    if (inputId) {
+      const { data: bladerData, error } = await supabase
+        .from('CUP_BLADER')
+        .select('blader_id, name')
+        .eq('blader_id', inputId)
+        .single();
 
-      if (userData && userData.Name) {
-        targetBlader = userData.Name;
+      if (bladerData && bladerData.name) {
+        targetBlader = bladerData.name;
+        targetBladerId = bladerData.blader_id;
       } else {
-        console.warn('該当するユーザーがいません');
+        console.warn('CUP_BLADERに該当blader_idが見つかりません。デフォルト名を使用します。');
       }
     }
 
@@ -861,159 +898,171 @@ async function calcResults() {
   // 画面要素
   const bladeTitle = document.getElementById('bladeTitle');
   const bladeSpec = document.getElementById('bladeSpec');
-  const bladeImage = document.getElementById('bladeImage');
   const totalPointsEl = document.getElementById('totalPoints');
   const totalNegPointsEl = document.getElementById('totalNegPoints');
   const overallRateEl = document.getElementById('overallRate');
 
-  // fetch ResultDB
-  const { data, error } = await supabase.from('ResultDB').select('*');
-  if (error) {
-    console.error('ResultDB fetch error', error);
+  // --- ブレーダー名表示 ---
+  bladeTitle.textContent = targetBlader;
+  // ヘッダーアイコン画像セット
+  const headerIcon = document.getElementById('bladerIconHeader');
+  if (headerIcon) {
+    const iconUrl = `https://beymetchannel.github.io/image-server/Blader/${targetBladerId}.jpg`;
+    headerIcon.src = iconUrl;
+    headerIcon.alt = targetBlader;
+    headerIcon.style.display = '';
+  }
+
+  // ---- CUP_MATCH から bladeSpec（勝/敗/分）を算出 ----
+  // blader_idが一致する全レコードを取得
+  let matchQuery = supabase.from('CUP_MATCH').select('result, side, score');
+  if (targetBladerId !== null) {
+    matchQuery = matchQuery.eq('blader_id', targetBladerId);
+  } else {
+    // フォールバック：blader_id が取れていない場合は空表示
+    bladeSpec.textContent = '勝: - / 敗: - / 引き分け: -';
+    overallRateEl.textContent = '-';
+    document.getElementById('lSideRate').textContent = '-';
+    document.getElementById('rSideRate').textContent = '-';
+    totalPointsEl.textContent = '0';
+    totalNegPointsEl.textContent = '0';
     return;
   }
-  const rows = data || [];
 
-  // --- opponentごとの合計で勝敗判定 ---
-  const opponents = {};
-  rows.forEach(row => {
-    const { LBlader, RBlader, LPoint, RPoint } = row;
-    if (typeof LPoint !== 'number' || typeof RPoint !== 'number') return;
+  const { data: matchRows, error: matchErr } = await matchQuery;
+  if (matchErr) {
+    console.error('CUP_MATCH fetch error', matchErr);
+    return;
+  }
+  const matches = matchRows || [];
 
-    let isLeft=false, myPoint, oppPoint, opponent;
-    if (LBlader === targetBlader) {
-      isLeft = true;
-      myPoint = LPoint;
-      oppPoint = RPoint;
-      opponent = RBlader;
-    } else if (RBlader === targetBlader) {
-      isLeft = false;
-      myPoint = RPoint;
-      oppPoint = LPoint;
-      opponent = LBlader;
-    } else return;
-
-    if (!opponents[opponent]) opponents[opponent] = { myTotal:0, oppTotal:0, lTotal:0, rTotal:0, lWins:0, rWins:0 };
-    opponents[opponent].myTotal += myPoint;
-    opponents[opponent].oppTotal += oppPoint;
-
-    // L/Rサイドカウント
-    if (isLeft) opponents[opponent].lTotal += 1;
-    else opponents[opponent].rTotal += 1;
+  // totalWins / totalLosses / totalDraws
+  let totalWins = 0, totalLosses = 0, totalDraws = 0;
+  matches.forEach(row => {
+    if (row.result === 'win') totalWins++;
+    else if (row.result === 'lose') totalLosses++;
+    else if (row.result === 'draw') totalDraws++;
   });
 
-  // 勝敗判定
-  let totalWins=0, totalLosses=0, totalDraws=0;
-  let lWins=0, lTotal=0, rWins=0, rTotal=0;
-
-  Object.values(opponents).forEach(v => {
-    if (v.myTotal > v.oppTotal) totalWins++;
-    else if (v.myTotal < v.oppTotal) totalLosses++;
-    else totalDraws++;
-
-    if (v.lTotal > 0) {
-      lTotal++;
-      if (v.myTotal > v.oppTotal) lWins++;
-    }
-    if (v.rTotal > 0) {
-      rTotal++;
-      if (v.myTotal > v.oppTotal) rWins++;
-    }
-  });
-
-  const lRate = lTotal ? `${((lWins/lTotal)*100).toFixed(1)}%` : '-';
-  const rRate = rTotal ? `${((rWins/rTotal)*100).toFixed(1)}%` : '-';
-  const overallRate = (totalWins + totalLosses + totalDraws) ? `${((totalWins / (totalWins+totalLosses+totalDraws))*100).toFixed(1)}%` : '-';
-
-  bladeTitle.textContent = targetBlader;
   bladeSpec.textContent = `勝: ${totalWins} / 敗: ${totalLosses} / 引き分け: ${totalDraws}`;
+
+  const totalGames = totalWins + totalLosses + totalDraws;
+  const overallRate = totalGames ? `${((totalWins / totalGames) * 100).toFixed(1)}%` : '-';
   overallRateEl.textContent = overallRate;
 
-  // --- 得点/失点はレコード単位で計算 ---
-  let totalWinPoints = 0, totalLosePoints = 0;
-  rows.forEach(row => {
-    const { LBlader, RBlader, LPoint, RPoint } = row;
-    if (typeof LPoint !== 'number' || typeof RPoint !== 'number') return;
-    let myPoint;
-    if (LBlader === targetBlader) myPoint = LPoint;
-    else if (RBlader === targetBlader) myPoint = RPoint;
-    else return;
-
-    if (myPoint > 0) totalWinPoints += myPoint;
-    if (myPoint < 0) totalLosePoints += myPoint;
-  });
-
-  totalPointsEl.textContent = totalWinPoints;
-  totalNegPointsEl.textContent = totalLosePoints;
-
-  // L/Rサイド勝率
+  // ---- side-rate-row: CUP_MATCH から L/R勝率算出 ----
+  const leftMatches = matches.filter(r => r.side === 'left');
+  const rightMatches = matches.filter(r => r.side === 'right');
+  const lWins = leftMatches.filter(r => r.result === 'win').length;
+  const rWins = rightMatches.filter(r => r.result === 'win').length;
+  const lRate = leftMatches.length ? `${((lWins / leftMatches.length) * 100).toFixed(1)}%` : '-';
+  const rRate = rightMatches.length ? `${((rWins / rightMatches.length) * 100).toFixed(1)}%` : '-';
   document.getElementById('lSideRate').textContent = lRate;
   document.getElementById('rSideRate').textContent = rRate;
 
+  // ---- small-stats: CUP_BATTLE から totalPoints / totalNegPoints 算出 ----
+  const { data: battleRows, error: battleErr } = await supabase
+    .from('CUP_BATTLE')
+    .select('point')
+    .eq('blader_id', targetBladerId);
+
+  if (battleErr) {
+    console.error('CUP_BATTLE fetch error', battleErr);
+    totalPointsEl.textContent = '0';
+    totalNegPointsEl.textContent = '0';
+  } else {
+    const battles = battleRows || [];
+    let totalPoints = 0, totalNegPoints = 0;
+    battles.forEach(row => {
+      const p = typeof row.point === 'number' ? row.point : 0;
+      if (p > 0) totalPoints += p;
+      if (p < 0) totalNegPoints += p;
+    });
+    totalPointsEl.textContent = totalPoints;
+    totalNegPointsEl.textContent = totalNegPoints;
+  }
+
   // --- 以下、Gearごとの統計表示 ---
-  const { data: userData, error: userError } = await supabase
-    .from('UserDB')
-    .select('Name, Blade1, Ratchet1, Bit1, Blade2, Ratchet2, Bit2, Blade3, Ratchet3, Bit3')
-    .eq('Name', targetBlader)
+  // CUP_BLADER から blade_1~3 / combo_1~3 を取得
+  const { data: bladerData, error: bladerError } = await supabase
+    .from('CUP_BLADER')
+    .select('blade_1, blade_2, blade_3, combo_1, combo_2, combo_3')
+    .eq('blader_id', targetBladerId)
     .single();
 
-  if (userError || !userData) return;
+  if (bladerError || !bladerData) return;
+
+  // finishMap: DB値 → 表示略号
+  const cupFinishMap = {
+    'spin':   'SF',
+    'burst':  'BF',
+    'over':   'OF',
+    'xtreme': 'XF'
+  };
+
+  // targetBladerId の CUP_BATTLE を一括取得（bey_id・point・finish）
+  const { data: allBattles, error: allBattlesErr } = await supabase
+    .from('CUP_BATTLE')
+    .select('bey_id, point, finish')
+    .eq('blader_id', targetBladerId);
+
+  const battles = allBattles || [];
 
   for (let i = 1; i <= 3; i++) {
-    const blade = userData[`Blade${i}`] || '';
-    const ratchet = userData[`Ratchet${i}`] || '';
-    const bit = userData[`Bit${i}`] || '';
-    const title = `${blade} ${ratchet} ${bit}`.trim();
+    const blade = bladerData[`blade_${i}`] || '';
+    const combo = bladerData[`combo_${i}`] || '';
+    //const beyId = bladerData[`blade_${i}`]; // data-index として使う bey_id
+    const beyId = i;
+    
+    // gear-title
+    document.getElementById(`gearTitle${i}`).textContent = combo || '(未設定)';
 
-    document.getElementById(`gearTitle${i}`).textContent = title || '(未設定)';
-    document.getElementById(`gearWinRateVal${i}`).textContent = '-';
-    document.getElementById(`gearPointsVal${i}`).textContent = '0';
-    document.getElementById(`gearNegPointsVal${i}`).textContent = '0';
-
+    // gear-thumb 画像
     const thumbEl = document.getElementById(`gearThumb${i}`);
     thumbEl.innerHTML = '';
-
     if (blade) {
-      const imgUrl = `https://beymetchannel.github.io/image-server/images/${blade}.png`;
-
-      thumbEl.innerHTML = `<img src="${imgUrl}" alt="${blade}">`;
+      thumbEl.innerHTML = `<img src="https://beymetchannel.github.io/image-server/images/${blade}.png" alt="${blade}">`;
     } else {
       thumbEl.textContent = '-';
     }
 
-    // 該当ギアの試合抽出
-    const relevantMatches = rows.filter(row => {
-      if (row.LBlader === targetBlader) return row.LBey === title;
-      if (row.RBlader === targetBlader) return row.RBey === title;
-      return false;
-    });
+    // このギアに該当するバトルレコードを絞り込む
+    const gearBattles = battles.filter(r => String(r.bey_id) === String(beyId));
 
-    let wins=0, points=0, negPoints=0;
-    const finishStats = { SF:{win:0,lose:0}, BF:{win:0,lose:0}, OF:{win:0,lose:0}, XF:{win:0,lose:0} };
+    if (!beyId || gearBattles.length === 0) {
+      document.getElementById(`gearWinRateVal${i}`).textContent = '-';
+      document.getElementById(`gearPointsVal${i}`).textContent = '0';
+      document.getElementById(`gearNegPointsVal${i}`).textContent = '0';
+      document.getElementById(`finishBlock${i}`).innerHTML = '';
+      continue;
+    }
 
-    relevantMatches.forEach(row => {
-      const isLeft = row.LBlader === targetBlader;
-      const myPoint = isLeft ? row.LPoint : row.RPoint;
-      const oppPoint = isLeft ? row.RPoint : row.LPoint;
-
-      if (myPoint > oppPoint) wins++;
-      if (myPoint > 0) points += myPoint;
-      if (myPoint < 0) negPoints += myPoint;
-
-      const finKey = finishMap[row.Finish];
-      if (!finKey) return;
-      if (myPoint > oppPoint) finishStats[finKey].win++;
-      else if (myPoint < oppPoint) finishStats[finKey].lose++;
-    });
-
-    const totalMatches = relevantMatches.length;
-    const winRate = totalMatches ? `${((wins/totalMatches)*100).toFixed(1)}%` : '-';
-
+    // gearWinRateVal：point>0 のレコード件数 ÷ 全レコード件数
+    const winCount = gearBattles.filter(r => r.point > 0).length;
+    const winRate = `${((winCount / gearBattles.length) * 100).toFixed(1)}%`;
     document.getElementById(`gearWinRateVal${i}`).textContent = winRate;
-    document.getElementById(`gearPointsVal${i}`).textContent = points;
+
+    // gearPointsVal：point>0 の合算
+    const posPoints = gearBattles
+      .filter(r => r.point > 0)
+      .reduce((sum, r) => sum + r.point, 0);
+    document.getElementById(`gearPointsVal${i}`).textContent = posPoints;
+
+    // gearNegPointsVal：point<0 の合算
+    const negPoints = gearBattles
+      .filter(r => r.point < 0)
+      .reduce((sum, r) => sum + r.point, 0);
     document.getElementById(`gearNegPointsVal${i}`).textContent = negPoints;
 
-    // 横棒グラフ
+    // finishBlock：決まり手別 勝利数 / 敗北数
+    const finishStats = { SF:{win:0,lose:0}, BF:{win:0,lose:0}, OF:{win:0,lose:0}, XF:{win:0,lose:0} };
+    gearBattles.forEach(r => {
+      const finKey = cupFinishMap[(r.finish || '').toLowerCase()];
+      if (!finKey) return;
+      if (r.point > 0) finishStats[finKey].win++;
+      else if (r.point < 0) finishStats[finKey].lose++;
+    });
+
     const finishBlock = document.getElementById(`finishBlock${i}`);
     let maxCount = 1;
     ['SF','BF','OF','XF'].forEach(k => {
@@ -1052,116 +1101,37 @@ calcResults();
 
 
 async function calcRanking(myName) {
-  // UserDB から全ブレーダー一覧取得
-  const { data: userList, error: userListErr } = await supabase
-    .from("UserDB")
-    .select("Name");
+  // CUP_MATCH から全レコード取得
+  const { data: matchAll, error: matchErr } = await supabase
+    .from('CUP_MATCH')
+    .select('blader_id, result, score');
 
-  if (userListErr) {
-    console.error('UserDB fetch error', userListErr);
-    return;
-  }
-  const allUsers = (userList || []).map(u => u.Name);
-
-  // ResultDB の全バトルデータ取得
-  const { data: battleList = [], error: battleErr } = await supabase
-    .from("ResultDB")
-    .select("*");
-
-  if (battleErr) {
-    console.error('ResultDB fetch error', battleErr);
+  if (matchErr) {
+    console.error('CUP_MATCH fetch error', matchErr);
     return;
   }
 
-  // 基礎集計用データ構造
-  const stats = {}; // goals を入れておく（表示用）
-  const opponentsMap = {}; // opponentsMap[player][opponent] = { myTotal, oppTotal }
-
-  function ensurePlayer(p) {
-    if (!stats[p]) stats[p] = { goalsFor:0, goalsAgainst:0 };
-    if (!opponentsMap[p]) opponentsMap[p] = {};
-  }
-
-  // 全試合を走査して得点集計 + 対戦相手ごとの合算値を作る
-  battleList.forEach(b => {
-    const L = b.LBlader;
-    const R = b.RBlader;
-    const Lscore = typeof b.LPoint === 'number' ? b.LPoint : 0;
-    const Rscore = typeof b.RPoint === 'number' ? b.RPoint : 0;
-
-    // プレイヤー確保
-    ensurePlayer(L);
-    ensurePlayer(R);
-
-    // 総得点集計（レコード単位の合算）
-    stats[L].goalsFor += Lscore;
-    stats[L].goalsAgainst += Rscore;
-    stats[R].goalsFor += Rscore;
-    stats[R].goalsAgainst += Lscore;
-
-    // opponentsMap に該当ペアを追加/更新
-    if (!opponentsMap[L][R]) opponentsMap[L][R] = { myTotal:0, oppTotal:0 };
-    if (!opponentsMap[R][L]) opponentsMap[R][L] = { myTotal:0, oppTotal:0 };
-
-    // L 側の記録にこの試合の得点を加算（合算は myTotal と oppTotal）
-    opponentsMap[L][R].myTotal += Lscore;
-    opponentsMap[L][R].oppTotal += Rscore;
-
-    // R 側の記録は逆に加算
-    opponentsMap[R][L].myTotal += Rscore;
-    opponentsMap[R][L].oppTotal += Lscore;
+  // blader_id ごとに集計
+  const stats = {}; // { [blader_id]: { wins, draws, score } }
+  (matchAll || []).forEach(row => {
+    const id = row.blader_id;
+    if (!stats[id]) stats[id] = { wins: 0, draws: 0, score: 0 };
+    if (row.result === 'win') stats[id].wins++;
+    if (row.result === 'draw') stats[id].draws++;
+    const s = typeof row.score === 'number' ? row.score : 0;
+    stats[id].score += s;
   });
 
-  // opponentsMap を元に、各選手の勝/負/分を決定（相手ごとの合算で判定）
-  const finalStats = {}; // { win, lose, draw, goalsFor, goalsAgainst }
-  // 初期化（表示対象は UserDB 登録者に限定）
-  allUsers.forEach(name => {
-    finalStats[name] = { win:0, lose:0, draw:0, goalsFor: (stats[name]?.goalsFor || 0), goalsAgainst: (stats[name]?.goalsAgainst || 0) };
-  });
-
-  // ただし opponentsMap に含まれる相手が UserDB にない場合でも、勝敗カウントの対象としたいなら
-  // allUsers のみを対象にしている点に注意（必要なら stats にある全キー基準に切替可能）
-  allUsers.forEach(player => {
-    const opponents = opponentsMap[player] || {};
-    Object.keys(opponents).forEach(opponent => {
-      // 対戦相手が UserDB に載っていない場合でも合算判定に含めたいならコメント外してください
-      // if (!finalStats[opponent]) return;
-
-      const pair = opponents[opponent];
-      const myTotal = pair.myTotal;
-      const oppTotal = pair.oppTotal;
-
-      if (myTotal > oppTotal) finalStats[player].win++;
-      else if (myTotal < oppTotal) finalStats[player].lose++;
-      else finalStats[player].draw++;
-    });
-  });
-
-  // ランキング配列作成
-  const rankingArray = allUsers.map(name => {
-    const fs = finalStats[name] || { win:0, lose:0, draw:0, goalsFor:0, goalsAgainst:0 };
-    const totalMatches = fs.win + fs.lose + fs.draw;
-    const winrate = totalMatches === 0 ? 0 : fs.win / totalMatches; // 勝 ÷ (勝+負+分)
-    const goalDiff = fs.goalsFor - fs.goalsAgainst;
-    return {
-      name,
-      winrate,
-      goalDiff,
-      goalsFor: fs.goalsFor,
-      raw: fs
-    };
-  });
-
-  // ソート：①勝率降順 → ②得失点差降順 → ③総得点降順 → ④名前昇順
+  // ランキング配列：第1優先=wins降順、第2優先=draws降順、第3優先=score降順
+  const rankingArray = Object.entries(stats).map(([id, s]) => ({ id, ...s }));
   rankingArray.sort((a, b) => {
-    if (b.winrate !== a.winrate) return b.winrate - a.winrate;
-    if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
-    if (b.goalsFor !== a.goalsFor) return b.goalsFor - a.goalsFor;
-    return a.name.localeCompare(b.name);
+    if (b.wins !== a.wins) return b.wins - a.wins;
+    if (b.draws !== a.draws) return b.draws - a.draws;
+    return b.score - a.score;
   });
 
-  // 自分の順位表示
-  const myIndex = rankingArray.findIndex(r => r.name === myName);
+  // 自分（targetBladerId）の順位を探す
+  const myIndex = rankingArray.findIndex(r => String(r.id) === String(targetBladerId));
   const myRankText = myIndex === -1 ? '-' : String(myIndex + 1);
   document.getElementById("rankingResult").textContent = myRankText;
 
@@ -1172,102 +1142,179 @@ async function calcRanking(myName) {
   } else {
     rankEl.classList.remove("rank-warning");
   }
-
 }
-calcRanking(targetBlader);
+calcRanking();
 
 
 
 
-async function loadBladerList(targetBlader) {
-    const { data, error } = await supabase
-        .from("UserDB")
-        .select("Name");
+async function loadBladerList() {
+    // 1. CUP_BLADER から entry=true の全ブレーダーを取得
+    const { data: allBladers, error: bladersErr } = await supabase
+        .from('CUP_BLADER')
+        .select('blader_id, name, combo_1, combo_2, combo_3')
+        .eq('entry', true);
+    if (bladersErr) { console.error(bladersErr); return; }
 
-    if (error) { console.error(error); return; }
+    // 2. CUP_MATCH を全取得
+    const { data: allMatches, error: matchErr } = await supabase
+        .from('CUP_MATCH')
+        .select('match_id, blader_id, result, score, side');
+    if (matchErr) { console.error(matchErr); return; }
+
+    // match_id ごとにグループ化
+    const matchByMatchId = {};
+    (allMatches || []).forEach(r => {
+        if (!matchByMatchId[r.match_id]) matchByMatchId[r.match_id] = [];
+        matchByMatchId[r.match_id].push(r);
+    });
+
+    // 自分のレコードだけ抽出
+    const myRecords = (allMatches || []).filter(r => String(r.blader_id) === String(targetBladerId));
+
+    // 対戦済み相手の blader_id セット & result マップ
+    const opponentSet = new Set();
+    const opponentResultMap = {};
+    myRecords.forEach(myRec => {
+        const peers = matchByMatchId[myRec.match_id] || [];
+        peers.forEach(r => {
+            const oppId = String(r.blader_id);
+            if (oppId !== String(targetBladerId)) {
+                opponentSet.add(oppId);
+                opponentResultMap[oppId] = myRec.result;
+            }
+        });
+    });
+
+    // 3. CUP_BATTLE を一括取得
+    const { data: allBattles, error: battleErr } = await supabase
+        .from('CUP_BATTLE')
+        .select('match_id, blader_id, bey_id, point, finish, round')
+        .order('round', { ascending: true });
+    if (battleErr) { console.error(battleErr); return; }
+
+    const battleByMatchId = {};
+    (allBattles || []).forEach(r => {
+        if (!battleByMatchId[r.match_id]) battleByMatchId[r.match_id] = [];
+        battleByMatchId[r.match_id].push(r);
+    });
+
+    // CUP_BLADER をマップ化（blader_id -> record）
+    const bladerMap = {};
+    (allBladers || []).forEach(b => { bladerMap[String(b.blader_id)] = b; });
+
+    const listFinishMap = {
+        'spin':'SF','Spin':'SF','SPIN':'SF',
+        'burst':'BF','Burst':'BF','BURST':'BF',
+        'over':'OF','Over':'OF','OVER':'OF',
+        'xtreme':'XF','Xtreme':'XF','XTREME':'XF'
+    };
+
+    // 4. ソート：未対戦を先、第2優先は blader_id 昇順
+    const opponents = (allBladers || []).filter(b => String(b.blader_id) !== String(targetBladerId));
+    opponents.sort((a, b) => {
+        const aPlayed = opponentSet.has(String(a.blader_id)) ? 1 : 0;
+        const bPlayed = opponentSet.has(String(b.blader_id)) ? 1 : 0;
+        if (aPlayed !== bPlayed) return aPlayed - bPlayed;
+        return String(a.blader_id).localeCompare(String(b.blader_id));
+    });
 
     const listBox = document.getElementById("bladerList");
     listBox.innerHTML = "";
 
-    const formatBeyName = (fullBey) => {
-      if (!fullBey) return '-';
-      const spaceIndex = fullBey.indexOf(' ');
-      
-      if (spaceIndex > -1) {
-        const bladeName = fullBey.substring(0, spaceIndex);
-        const rest = fullBey.substring(spaceIndex + 1).trim();
-                  // ※ HTMLの改行タグ<br>を使用
-        return `${bladeName}<br>${rest}`; 
-      } else {
-        return fullBey;
-      }
-    };
+    for (const opp of opponents) {
+        const oppId = String(opp.blader_id);
+        const isPlayed = opponentSet.has(oppId);
+        const rawResult = isPlayed ? (opponentResultMap[oppId] || '-') : '-';
+        const resultDisplay = isPlayed
+            ? (rawResult.charAt(0).toUpperCase() + rawResult.slice(1).toLowerCase())
+            : '-';
+        const resultClass = isPlayed ? resultDisplay : 'None';
 
-    for (const user of data) {
-        if (user.Name === targetBlader) continue;
+        // 自分と相手が同じ match_id に存在する試合を特定
+        const sharedMatchIds = myRecords
+            .filter(myRec => (matchByMatchId[myRec.match_id] || []).some(r => String(r.blader_id) === oppId))
+            .map(r => r.match_id);
 
-        const opponentBlader = user.Name; 
-        const result = await getMatchResult(targetBlader, opponentBlader);
-        const summary = await getMatchSummary(targetBlader, opponentBlader);
-        
+        let matchDetailHtml = '';
+
+        for (const mid of sharedMatchIds) {
+            const matchRecords = matchByMatchId[mid] || [];
+            const myMatchRec  = matchRecords.find(r => String(r.blader_id) === String(targetBladerId));
+            const oppMatchRec = matchRecords.find(r => String(r.blader_id) === oppId);
+            if (!myMatchRec || !oppMatchRec) continue;
+
+            const myIsLeft   = myMatchRec.side === 'left';
+            const lRec = myIsLeft ? myMatchRec : oppMatchRec;
+            const rRec = myIsLeft ? oppMatchRec : myMatchRec;
+            const lName = myIsLeft ? targetBlader : opp.name;
+            const rName = myIsLeft ? opp.name : targetBlader;
+
+            matchDetailHtml += `
+                <div class="match-summary-row">
+                    <div class="summary-name">${lName}</div>
+                    <div class="summary-point point-l">${lRec.score ?? '-'}</div>
+                    <div class="summary-point point-r">${rRec.score ?? '-'}</div>
+                    <div class="summary-name">${rName}</div>
+                </div>`;
+
+            // round ごとにペア化して match-row を構築
+            const rounds = {};
+            (battleByMatchId[mid] || []).forEach(b => {
+                if (!rounds[b.round]) rounds[b.round] = [];
+                rounds[b.round].push(b);
+            });
+
+            Object.keys(rounds).sort((a,b) => Number(a)-Number(b)).forEach(rnd => {
+                const recs = rounds[rnd];
+                const myBattle  = recs.find(r => String(r.blader_id) === String(targetBladerId));
+                const oppBattle = recs.find(r => String(r.blader_id) === oppId);
+                if (!myBattle || !oppBattle) return;
+
+                const lBattle = myIsLeft ? myBattle : oppBattle;
+                const rBattle = myIsLeft ? oppBattle : myBattle;
+
+                // combo は CUP_BLADER.combo_{bey_id} から取得
+                const myBladerRec  = bladerMap[String(targetBladerId)] || {};
+                const lCombo = (myIsLeft ? myBladerRec : opp)[`combo_${lBattle.bey_id}`] || '-';
+                const rCombo = (myIsLeft ? opp : myBladerRec)[`combo_${rBattle.bey_id}`] || '-';
+
+                const lFinishKey = listFinishMap[lBattle.finish] || '';
+                const rFinishKey = listFinishMap[rBattle.finish] || '';
+                const finishL = (lBattle.point > 0 && lFinishKey) ? lFinishKey : '-';
+                const finishR = (rBattle.point > 0 && rFinishKey) ? rFinishKey : '-';
+
+                matchDetailHtml += `
+                    <div class="match-row">
+                        <div class="lbey">${lCombo}</div>
+                        <div class="finish-l">${finishL}</div>
+                        <div class="finish-r">${finishR}</div>
+                        <div class="rbey">${rCombo}</div>
+                    </div>`;
+            });
+        }
+
+        if (!isPlayed) {
+            matchDetailHtml = '<div style="color:rgba(255,255,255,0.4);font-size:12px;padding:8px 4px;">未対戦</div>';
+        }
+
         const card = document.createElement("div");
         card.className = "result-blader-card";
-
-        // matchDetails を取得
-        const rawMatchDetails = await getMatchDetails(targetBlader, opponentBlader);
-
-        const processedMatchDetails = rawMatchDetails.map(match => {
-            const finalLBey = formatBeyName(match.LBey);
-            const finalRBey = formatBeyName(match.RBey);
-            const finalFinishL = match.FinishL;
-            const finalFinishR = match.FinishR;
-
-            return {
-                LBey: finalLBey,
-                RBey: finalRBey,
-                FinishL: finalFinishL,
-                FinishR: finalFinishR
-            };
-        });
-
-        const resultClass = (result === '-') ? 'None' : result;
-
-        // --- match-detail の構築 ---
-        let matchDetailHtml = `
-            <div class="match-summary-row">
-                <div class="summary-name">${summary.LBlader}</div>
-                <div class="summary-point point-l">${summary.LTotal}</div>
-                <div class="summary-point point-r">${summary.RTotal}</div>
-                <div class="summary-name">${summary.RBlader}</div>
-            </div>
-        `;
-        
-        // 各試合結果を追加
-        matchDetailHtml += processedMatchDetails.map(match => `
-            <div class="match-row">
-                <div class="lbey">${match.LBey}</div>
-                <div class="finish-l">${match.FinishL}</div>
-                <div class="finish-r">${match.FinishR}</div>
-                <div class="rbey">${match.RBey}</div>
-            </div>
-        `).join('');
-
         card.innerHTML = `
             <div class="top-row">
-                <div class="battle-tag tag-${resultClass}">${result}</div>
-
-                <div class="result-name">vs. ${opponentBlader}</div>
+                <div class="battle-tag tag-${resultClass}">${resultDisplay}</div>
+                <div class="result-name">
+                  vs.&nbsp;<img class="blader-icon-sm" src="https://beymetchannel.github.io/image-server/Blader/${oppId}.jpg" alt="${opp.name}" onerror="this.style.display='none'">&nbsp;${opp.name}
+                </div>
                 <div class="caret">▼</div>
             </div>
             <div class="match-detail" style="display:none;">
                 ${matchDetailHtml}
-            </div>
-        `;
+            </div>`;
 
         card.addEventListener('click', () => {
             const detailDiv = card.querySelector('.match-detail');
             const caretIcon = card.querySelector('.caret');
-            
             if (detailDiv.style.display === 'none') {
                 detailDiv.style.display = 'block';
                 caretIcon.style.transform = 'rotate(180deg)';
@@ -1280,153 +1327,9 @@ async function loadBladerList(targetBlader) {
         listBox.appendChild(card);
     }
 }
-
-
-async function getMatchResult(targetBlader, opponentBlader) {
-    // 該当する全試合データを取得
-    const { data: matches, error } = await supabase
-        .from('ResultDB')
-        .select('LBlader, RBlader, LPoint, RPoint')
-        .or(`and(LBlader.eq.${targetBlader},RBlader.eq.${opponentBlader}),and(LBlader.eq.${opponentBlader},RBlader.eq.${targetBlader})`);
-
-    if (error || !matches) {
-        console.error("Match result fetch error:", error);
-        return '-';
-    }
-
-    if (matches.length === 0) {
-        return '-'; // 試合がない場合
-    }
-
-    let targetTotalPoints = 0;
-    let opponentTotalPoints = 0;
-
-    matches.forEach(row => {
-        const LPoint = typeof row.LPoint === 'number' ? row.LPoint : 0;
-        const RPoint = typeof row.RPoint === 'number' ? row.RPoint : 0;
-
-        const myScore = row.LBlader === targetBlader ? LPoint : RPoint;
-        const oppScore = row.RBlader === targetBlader ? LPoint : RPoint;
-        
-        targetTotalPoints += Math.max(0, myScore);
-        opponentTotalPoints += Math.max(0, oppScore);
-    });
-
-    if (targetTotalPoints > opponentTotalPoints) {
-        return 'Win';
-    } else if (targetTotalPoints < opponentTotalPoints) {
-        return 'Lose';
-    } else {
-        return 'Draw';
-    }
-}
-
-async function getMatchDetails(a, b) {
-    // aがLBlader (matches1) の場合と、aがRBlader (matches2) の場合の両方の試合を取得
-    // DBの LBlader が a, RBlader が b の試合
-    const { data: matches1 } = await supabase
-        .from('ResultDB')
-        .select('LBlader, LBey, RBlader, RBey, Finish, LPoint, RPoint')
-        .eq('LBlader', a)
-        .eq('RBlader', b);
-
-    // DBの RBlader が a, LBlader が b の試合
-    const { data: matches2 } = await supabase
-        .from('ResultDB')
-        .select('LBlader, LBey, RBlader, RBey, Finish, LPoint, RPoint')
-        .eq('RBlader', a)
-        .eq('LBlader', b);
-
-    const allMatches = [...(matches1 || []), ...(matches2 || [])];
-    
-    // 試合ごとの詳細データを作成（ここではまだDBのL/Rの視点）
-    return allMatches.map(row => {
-        let lPoint = row.LPoint;
-        let rPoint = row.RPoint;
-        let finishType = finishMap[row.Finish] || '-'; // "Spin" -> "SF"などに変換
-
-        let finishL = '-';
-        let finishR = '-';
-
-        // LPoint, RPoint が数値型であることを確認
-        if (typeof lPoint === 'number' && typeof rPoint === 'number') {
-            if (lPoint > rPoint) {
-                // LBlader の勝ち
-                finishL = finishType;
-            } else if (lPoint < rPoint) {
-                // RBlader の勝ち
-                finishR = finishType;
-            }
-        }
-
-        return {
-            LBlader: row.LBlader, // 新しく追加: どちらがLか判定するために必要
-            RBlader: row.RBlader, // 新しく追加: どちらがRか判定するために必要
-            LBey: row.LBey,
-            RBey: row.RBey,
-            // DBのLBlader側が勝ったフィニッシュ
-            FinishL: finishL, 
-            // DBのRBlader側が勝ったフィニッシュ
-            FinishR: finishR, 
-        };
-    });
-}
-
-
-async function getMatchSummary(a, b) {
-    // aとbの間の全試合データを取得
-    const { data: matches, error } = await supabase
-        .from('ResultDB')
-        .select('LBlader, RBlader, LPoint, RPoint')
-        .or(`and(LBlader.eq.${a},RBlader.eq.${b}),and(LBlader.eq.${b},RBlader.eq.${a})`);
-
-    if (error || !matches || matches.length === 0) {
-        // 試合がない場合、LBladerとRBladerは引数a, bとして返す
-        return { LTotal: 0, RTotal: 0, LBlader: a, RBlader: b };
-    }
-
-    // 基準となるLBladerとRBladerを最初の試合データから特定
-    // これらはResultDBに記録されている「真の」L/Rブレーダー
-    const baseLBlader = matches[0].LBlader;
-    const baseRBlader = matches[0].RBlader;
-
-    let lTotalPoints = 0;
-    let rTotalPoints = 0;
-
-    matches.forEach(row => {
-        const LPoint = typeof row.LPoint === 'number' ? row.LPoint : 0;
-        const RPoint = typeof row.RPoint === 'number' ? row.RPoint : 0;
-        
-        // 試合データが baseLBlader (最初のLBlader) をL側に持つ場合
-        if (row.LBlader === baseLBlader) {
-            lTotalPoints += Math.max(0, LPoint);
-            rTotalPoints += Math.max(0, RPoint);
-        } 
-        // 試合データが baseLBlader (最初のLBlader) をR側に持つ場合
-        else if (row.RBlader === baseLBlader) {
-            // DBのRPointがbaseLBladerのスコアなので、lTotalPointsに加算
-            lTotalPoints += Math.max(0, RPoint);
-            // DBのLPointがbaseRBladerのスコアなので、rTotalPointsに加算
-            rTotalPoints += Math.max(0, LPoint);
-        }
-        // ただし、通常、このOR検索の結果はLBlader, RBladerの組み合わせが一定であるはずなので、
-        // 厳密にはここまでの条件分岐は不要かもしれませんが、安全のため残します。
-    });
-
-    // DB上の LBlader と RBlader、およびその合計ポイントを返す
-    return {
-        LTotal: lTotalPoints,
-        RTotal: rTotalPoints,
-        LBlader: baseLBlader, // DB上のLBlader
-        RBlader: baseRBlader  // DB上のRBlader
-    };
-}
-loadBladerList(targetBlader);
+loadBladerList();
 
 
 </script>
 </body>
 </html>
-
-
-
