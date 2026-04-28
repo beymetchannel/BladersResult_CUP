@@ -1100,42 +1100,64 @@ async function calcResults() {
 calcResults();
 
 
-async function calcRanking(myName) {
-  // CUP_MATCH から全レコード取得
+async function calcRanking() {
+  // 1. CUP_MATCH から全レコード取得 (勝数、分数を集計)
   const { data: matchAll, error: matchErr } = await supabase
     .from('CUP_MATCH')
-    .select('blader_id, result, score');
+    .select('blader_id, result');
 
   if (matchErr) {
     console.error('CUP_MATCH fetch error', matchErr);
     return;
   }
 
-  // blader_id ごとに集計
-  const stats = {}; // { [blader_id]: { wins, draws, score } }
+  // 2. CUP_BATTLE から全レコード取得 (すべての point を合算して得失点差を算出)
+  const { data: battleAll, error: battleErr } = await supabase
+    .from('CUP_BATTLE')
+    .select('blader_id, point');
+
+  if (battleErr) {
+    console.error('CUP_BATTLE fetch error', battleErr);
+    return;
+  }
+
+  // 集計用オブジェクト
+  const stats = {}; // { [blader_id]: { wins, draws, netPoints } }
+
+  // --- 勝敗・引き分け数の集計 ---
   (matchAll || []).forEach(row => {
     const id = row.blader_id;
-    if (!stats[id]) stats[id] = { wins: 0, draws: 0, score: 0 };
+    if (!stats[id]) stats[id] = { wins: 0, draws: 0, netPoints: 0 };
     if (row.result === 'win') stats[id].wins++;
     if (row.result === 'draw') stats[id].draws++;
-    const s = typeof row.score === 'number' ? row.score : 0;
-    stats[id].score += s;
   });
 
-  // ランキング配列：第1優先=wins降順、第2優先=draws降順、第3優先=score降順
+  // --- 得失点差（pointの合算）の集計 ---
+  (battleAll || []).forEach(row => {
+    const id = row.blader_id;
+    if (!stats[id]) stats[id] = { wins: 0, draws: 0, netPoints: 0 };
+    const p = typeof row.point === 'number' ? row.point : 0;
+    stats[id].netPoints += p; // 正（得点）と負（失点）がそのまま合算され、差分になります！
+  });
+
+  // 3. ランキング配列のソート
+  // 第1優先：勝利数 (wins) 降順
+  // 第2優先：引き分け数 (draws) 降順
+  // 第3優先：得失点差 (netPoints) 降順
   const rankingArray = Object.entries(stats).map(([id, s]) => ({ id, ...s }));
   rankingArray.sort((a, b) => {
     if (b.wins !== a.wins) return b.wins - a.wins;
     if (b.draws !== a.draws) return b.draws - a.draws;
-    return b.score - a.score;
+    return b.netPoints - a.netPoints;
   });
 
-  // 自分（targetBladerId）の順位を探す
+  // 4. 結果の反映（自分の順位表示）
   const myIndex = rankingArray.findIndex(r => String(r.id) === String(targetBladerId));
   const myRankText = myIndex === -1 ? '-' : String(myIndex + 1);
-  document.getElementById("rankingResult").textContent = myRankText;
-
   const rankEl = document.getElementById("rankingResult");
+  rankEl.textContent = myRankText;
+
+  // 上位入賞（4位以内）の強調演出
   const rankValue = Number(myRankText);
   if (!isNaN(rankValue) && rankValue > 0 && rankValue <= 4) {
     rankEl.classList.add("rank-warning");
