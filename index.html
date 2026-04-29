@@ -1171,10 +1171,10 @@ calcRanking();
 
 
 async function loadBladerList() {
-    // 1. CUP_BLADER から entry=true の全ブレーダーを取得
+    // 1. CUP_BLADER から entry=true の全ブレーダーを取得 (kanaを追加)
     const { data: allBladers, error: bladersErr } = await supabase
         .from('CUP_BLADER')
-        .select('blader_id, name, combo_1, combo_2, combo_3')
+        .select('blader_id, name, combo_1, combo_2, combo_3, kana') 
         .eq('entry', true);
     if (bladersErr) { console.error(bladersErr); return; }
 
@@ -1232,13 +1232,17 @@ async function loadBladerList() {
         'xtreme':'XF','Xtreme':'XF','XTREME':'XF'
     };
 
-    // 4. ソート：未対戦を先、第2優先は blader_id 昇順
+    // 4. ソート：未対戦を先、第2優先は kana のひらがな昇順
     const opponents = (allBladers || []).filter(b => String(b.blader_id) !== String(targetBladerId));
     opponents.sort((a, b) => {
+        // 未対戦(0)が先、対戦済み(1)が後になるよう比較
         const aPlayed = opponentSet.has(String(a.blader_id)) ? 1 : 0;
         const bPlayed = opponentSet.has(String(b.blader_id)) ? 1 : 0;
         if (aPlayed !== bPlayed) return aPlayed - bPlayed;
-        return String(a.blader_id).localeCompare(String(b.blader_id));
+
+        // 第2優先：kanaフィールドによるひらがな昇順ソート
+        // localeCompareの第2引数に'ja'を指定することで日本語として適切に比較します
+        return (a.kana || "").localeCompare(b.kana || "", "ja");
     });
 
     const listBox = document.getElementById("bladerList");
